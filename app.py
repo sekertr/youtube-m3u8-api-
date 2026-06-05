@@ -1,10 +1,23 @@
 from flask import Flask, jsonify, request
 import yt_dlp
-import re
+import os
+import tempfile
 
 app = Flask(__name__)
 
+def get_cookies_file():
+    cookies_content = os.environ.get('YOUTUBE_COOKIES')
+    if not cookies_content:
+        return None
+    # Geçici dosyaya yaz
+    tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False)
+    tmp.write(cookies_content)
+    tmp.close()
+    return tmp.name
+
 def get_m3u8(youtube_url):
+    cookies_file = get_cookies_file()
+    
     ydl_opts = {
         'quiet': True,
         'skip_download': True,
@@ -12,19 +25,18 @@ def get_m3u8(youtube_url):
         'format': 'best[protocol=m3u8_native]/best',
     }
     
+    if cookies_file:
+        ydl_opts['cookiefile'] = cookies_file
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)
-        
-        # Canlı yayın HLS URL'sini bul
         formats = info.get('formats', [])
         
-        # Önce m3u8_native formatını ara
         for f in formats:
             if f.get('protocol') in ('m3u8_native', 'm3u8'):
                 if f.get('url'):
                     return f['url']
         
-        # Bulamazsa manifest_url'e bak
         if info.get('manifest_url'):
             return info['manifest_url']
             
