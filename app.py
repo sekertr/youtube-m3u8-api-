@@ -23,25 +23,42 @@ def get_cookies_file():
 
 def get_m3u8(youtube_url):
     cookies_file = get_cookies_file()
+    
     ydl_opts = {
-        'quiet': True,
+        'quiet': False,
         'skip_download': True,
-        'no_warnings': True,
-        'format': 'best[protocol=m3u8_native]/best',
+        'no_warnings': False,
+        # Format filtresini kaldır, her şeyi listele
+        'format': 'best',
     }
+    
     if cookies_file:
         ydl_opts['cookiefile'] = cookies_file
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         info = ydl.extract_info(youtube_url, download=False)
+        
         formats = info.get('formats', [])
+        
+        # Tüm formatları logla (debug için)
+        for f in formats:
+            print(f"Format: {f.get('format_id')} | protocol: {f.get('protocol')} | url: {f.get('url','')[:80]}")
+        
+        # Önce m3u8 ara
         for f in formats:
             if f.get('protocol') in ('m3u8_native', 'm3u8'):
                 if f.get('url'):
                     return f['url']
+        
+        # m3u8 yoksa manifest_url'e bak
         if info.get('manifest_url'):
             return info['manifest_url']
-        raise Exception("M3U8 URL bulunamadı")
+        
+        # Hiçbiri yoksa en iyi formatı döndür
+        if formats:
+            return formats[-1].get('url')
+            
+        raise Exception("Hiçbir format bulunamadı")
 
 @app.route('/')
 def index():
